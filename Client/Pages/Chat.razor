@@ -1,0 +1,193 @@
+﻿@*@page "/"
+    <h1>Hello, world!</h1>
+    Welcome to your new app.
+    <SurveyPrompt Title="How is Blazor working for you?" />*@
+
+@page "/Chat"
+@using Microsoft.AspNetCore.SignalR.Client
+
+@using BlazorApp3.Shared;
+
+@using BlazorStrap;
+@using System.ComponentModel.DataAnnotations;
+@inject HttpClient Http
+
+
+@inject NavigationManager NavigationManager
+@inject IBootstrapCSS BootstrapCSS
+
+<BSForm Model="userInput" OnValidSubmit="@(() => Console.WriteLine("Valid") )" ValidateOnInit="true">
+    <DataAnnotationsValidator />
+    <BSFormGroup IsRow="true" >
+        <BSLabel For="idUser" SM="1">User Name:</BSLabel>
+        <BSCol SM="3">
+            <BSInput @bind-Value="@userInput.User" Id="idUser" InputType="InputType.Text" PlaceHolder="이름을 입력하세요." ></BSInput>
+            @*<BSInput @bind-Value="@userInput.User" Id="idUser" InputType="InputType.Text" PlaceHolder="이름을 입력하세요." ValidateOnChange="true"></BSInput>*@
+        </BSCol>
+    </BSFormGroup>
+
+    @*<BSFormGroup IsRow="true" >
+        <BSLabel For="idGroup" SM="1">Group:</BSLabel>
+        <BSCol SM="3">
+            <BSInput For="idGroup" @bind-Value="@userInput.GroupString" Id="idGroupStringr" InputType="InputType.Text" PlaceHolder="input group code....."></BSInput>
+        </BSCol>
+    </BSFormGroup>*@
+
+    <BSFormGroup IsRow="true">
+        <BSLabel For="idMessage" SM="1">Message:</BSLabel>
+        <BSCol SM="5">
+            <BSInput @bind-Value="@userInput.Message" Id="idMessage" InputType="InputType.Text" @onkeypress="onkeypress"></BSInput>
+            <BSFormFeedback For="@(() => userInput.Message)" ValidMessage="message here....." ></BSFormFeedback>
+            @*<input @bind="messageInput" size="50" />*@
+        </BSCol>
+    </BSFormGroup>
+    <BSButton Color="Color.Success" Size="Size.Small" @onclick="Send" disabled="@(!IsConnected)">Send</BSButton>
+    <BSButton Color="Color.Warning" Size="Size.Small" @onclick="Clear">clear</BSButton>
+    @*<BSButton Color="Color.Light" Size="Size.Small"> <NavLink class="nav-link" href="PopupWin"> PopupWin</NavLink></BSButton>*@
+
+</BSForm>
+
+<hr>
+
+<div id="messagesList" style="width:100%;">
+    @foreach (var item in MsgList)
+    {
+        iLoop++;
+        //if (userInput.User != null)
+        //{
+        //    item.notsee = item.notsee.Replace(userInput.User + ",", "");
+        //    item.notsee = item.notsee.Replace(userInput.User, "");
+        //}
+
+        @if (item.user.Equals(userInput.User))
+        {
+            // my message
+            <span style="float:right;">                
+                @if (item.notsee.Length > 3){
+                    <font size="1" title="(@item.notsee)"> (@(item.notsee.Split(",", StringSplitOptions.RemoveEmptyEntries).Count()))</font>
+                }
+            <font size="2">(@item.MsgTime.ToShortTimeString())</font><font size="3"> @item.msg</font><font size="3"><b>:@item.user</b></font>
+            </span>
+        }
+        else
+        {
+            // other message
+            <span style="">
+                <font size="3"><b>@item.user:</b></font><font size="3"> @item.msg </font><font size="2">(@item.MsgTime.ToShortTimeString())</font>
+                @if (item.notsee.Length > 3){
+                    <font size="1" title="(@item.notsee)"> (@(item.notsee.Split(",", StringSplitOptions.RemoveEmptyEntries).Count()))</font>
+                }
+            </span>
+        }<br style="float:none;" />
+
+        @if (iLoop == MsgList.Count()) //
+        {
+            hubConnection.SendAsync("LastMessageSee", userInput.User);
+            Console.Write("Call_" + userInput.User + "_LastMessageSee");
+        } 
+    }
+</div>
+
+<ul id="otherResultList">
+    @foreach (var item in otherResult)
+    {
+        <li>@item</li>
+    }
+</ul>
+
+@code {
+    private HubConnection hubConnection;
+    private List<ChatMsgList> MsgList = new List<ChatMsgList>();
+
+    private List<string> otherResult = new List<string>();
+
+    private FormsModel userInput = new FormsModel();
+    //private FormsModel messageInput = new FormsModel();
+
+    private int iLoop=0;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        Console.Write("OnAfterRender(firstRender)");
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chatHub"))
+            .Build();
+
+        hubConnection.On<FormsModel>("ReceiveMessage", (revData) =>
+        {
+            var encodedMsg = $"{revData.User}: {revData.Message}";
+            MsgList.Add(
+                new ChatMsgList()
+                {
+                    MsgTime = DateTime.Now,
+                    msg = revData.Message,
+                    user = revData.User,
+                    notsee = revData.NotSee
+                });
+
+            if (revData.Blank.Equals("no"))
+                otherResult.AddRange(revData.OtherResult);
+            else
+                otherResult.Clear();
+
+            ///////////////////////////////////////////////////////
+            iLoop = 0;
+            StateHasChanged();
+        });
+
+        hubConnection.On<List<ChatMsgList>>("LastMessageSeePrs", (revData) =>
+        {
+            MsgList = revData;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    //Task Send() =>
+    //    hubConnection.SendAsync("SendMessage", userInput.Valid, userInput.Message);
+
+    private void Send()
+    {
+        if (userInput.User.Trim() != "")
+            hubConnection.SendAsync("SendMessage", userInput);
+        //            hubConnection.SendAsync("SendMessage", userInput.Valid, userInput.Message);
+
+    }
+
+    public bool IsConnected =>
+    hubConnection.State == HubConnectionState.Connected;
+
+    private void Clear()
+    {
+        MsgList.Clear();
+    }
+
+    private void OpenPopup()
+    {
+
+    }
+
+    private void onkeypress(KeyboardEventArgs k)
+    {
+
+        if (k.Key == "Enter")
+        {
+            Send();
+        }
+    }
+
+    //private bool codeCheck(BSForm editContext)
+    //{
+    //    var serverChecksValid = false;
+
+    //    return serverChecksValid;
+    //}
+
+}

@@ -1,0 +1,53 @@
+﻿@inherits LayoutComponentBase
+@inject IBootstrapCss BootstrapCss
+
+
+<MatDrawerContainer Style="width: 180vw; height: 100vh;">
+    <MatDrawer @bind-Opened="@Opened">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    </MatDrawer>
+
+    <MatDrawerContent>
+
+        <div class="main">
+            <div class="top-row px-4">
+                <div>
+                    <MatButton OnClick="@((e) => ButtonClicked())">
+                        @if (Opened)
+                        {
+                            <span>Hide Menu</span>
+                        }
+                        else
+                        {
+                            <span>Open Menu</span>
+                        }
+                    </MatButton>
+                </div>
+                <a href="http://blazor.net" target="_blank" class="ml-md-auto">About</a>
+            </div>
+
+            <div class="content px-4">
+                @Body
+            </div>
+        </div>
+
+    </MatDrawerContent>
+
+</MatDrawerContainer>
+
+
+
+
+@code
+{
+    bool Opened = true;
+
+    void ButtonClicked()
+    {
+        Opened = !Opened;
+    }
+
+
+}
